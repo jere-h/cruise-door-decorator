@@ -25,6 +25,75 @@
   // styles.css mirrors this in its @page { margin } rule.
   var PAGE_MARGIN_MM = 10;
 
+  // --- Room number plate (unusable keep-out zone) --------------------------
+  // Disney resort / stateroom doors carry a circular metal plate with the room
+  // number in the upper-middle of the door. We model it as a circular keep-out
+  // region: decals may not be placed under it. The plate scales with the door
+  // (centred horizontally, a fixed distance from the top).
+  var PLATE_DIAMETER_CM = 18;
+  var PLATE_CENTER_Y_CM = 30; // centre of the plate, measured from the door top
+
+  /**
+   * The plate's bounding box (a square that bounds the circular plate) in cm,
+   * relative to the door's top-left corner. Derived from the door so it stays
+   * centred and proportional for any door size.
+   *
+   * @param {{widthCm:number, heightCm:number}} door
+   * @returns {{xCm:number, yCm:number, widthCm:number, heightCm:number, diameterCm:number, centerXCm:number, centerYCm:number}}
+   */
+  function getPlateRect(door) {
+    var doorW = (door && isFinite(door.widthCm)) ? door.widthCm : DOOR_W_CM;
+    var d = PLATE_DIAMETER_CM;
+    var centerX = doorW / 2;
+    var centerY = PLATE_CENTER_Y_CM;
+    return {
+      xCm: centerX - d / 2,
+      yCm: centerY - d / 2,
+      widthCm: d,
+      heightCm: d,
+      diameterCm: d,
+      centerXCm: centerX,
+      centerYCm: centerY
+    };
+  }
+
+  /**
+   * Push a decal box out of a reserved rectangle (the number plate) by the
+   * smallest in-bounds displacement. The decal box is moved fully clear on
+   * whichever axis is cheapest (above/below/left/right). If no candidate fits
+   * inside the door, the box is returned unchanged (e.g. a decal larger than the
+   * free space) — door-bounds clamping still applies upstream.
+   *
+   * @param {{x:number, y:number, w:number, h:number}} box
+   * @param {{xCm:number, yCm:number, widthCm:number, heightCm:number}} rect
+   * @param {number} doorW
+   * @param {number} doorH
+   * @returns {{x:number, y:number}}
+   */
+  function pushOutOfRect(box, rect, doorW, doorH) {
+    var EPS = 1e-9;
+    var overlaps =
+      box.x < rect.xCm + rect.widthCm - EPS &&
+      box.x + box.w > rect.xCm + EPS &&
+      box.y < rect.yCm + rect.heightCm - EPS &&
+      box.y + box.h > rect.yCm + EPS;
+    if (!overlaps) return { x: box.x, y: box.y };
+
+    var candidates = [];
+    var above = rect.yCm - box.h;
+    if (above >= -EPS) candidates.push({ x: box.x, y: Math.max(0, above), d: Math.abs(box.y - above) });
+    var below = rect.yCm + rect.heightCm;
+    if (below + box.h <= doorH + EPS) candidates.push({ x: box.x, y: below, d: Math.abs(below - box.y) });
+    var left = rect.xCm - box.w;
+    if (left >= -EPS) candidates.push({ x: Math.max(0, left), y: box.y, d: Math.abs(box.x - left) });
+    var right = rect.xCm + rect.widthCm;
+    if (right + box.w <= doorW + EPS) candidates.push({ x: right, y: box.y, d: Math.abs(right - box.x) });
+
+    if (!candidates.length) return { x: box.x, y: box.y };
+    candidates.sort(function (a, b) { return a.d - b.d; });
+    return { x: candidates[0].x, y: candidates[0].y };
+  }
+
   // --- Preview scale --------------------------------------------------------
   // The preview is scaled so the full door height fits a comfortable target
   // height on screen. This yields ONE fixed pixels-per-cm factor; there is no
@@ -97,6 +166,16 @@
     var yCm = isFinite(d.yCm) ? d.yCm : 0;
     xCm = Math.max(0, Math.min(xCm, maxX));
     yCm = Math.max(0, Math.min(yCm, maxY));
+
+    // Keep the decal clear of the room number plate (the unusable zone). This
+    // runs after door-bounds clamping; the push only moves within the door.
+    var plate = getPlateRect({ widthCm: doorW, heightCm: doorH });
+    var pushed = pushOutOfRect(
+      { x: xCm, y: yCm, w: widthCm, h: heightCm },
+      plate, doorW, doorH
+    );
+    xCm = pushed.x;
+    yCm = pushed.y;
 
     // Return a shallow copy with corrected geometry, preserving other fields.
     var out = {};
@@ -250,9 +329,12 @@
     A4_W_MM: A4_W_MM,
     A4_H_MM: A4_H_MM,
     PAGE_MARGIN_MM: PAGE_MARGIN_MM,
+    PLATE_DIAMETER_CM: PLATE_DIAMETER_CM,
+    PLATE_CENTER_Y_CM: PLATE_CENTER_Y_CM,
     PX_PER_CM: PX_PER_CM,
     cmToPreviewPx: cmToPreviewPx,
     previewPxToCm: previewPxToCm,
+    getPlateRect: getPlateRect,
     clampDecalToDoor: clampDecalToDoor,
     packPrintLayout: packPrintLayout,
     usablePageMm: usablePageMm,

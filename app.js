@@ -2,8 +2,10 @@
  * app.js - Wiring + view/render + interaction layer (Cruise Door Decal Studio).
  *
  * One-way data flow: input event -> store mutation -> emit -> render(state).
- * render(state) is the SOLE store subscriber and fully (re)paints the door,
- * the gallery, and the placed decals from the current cm-only state.
+ * render(state) is the SOLE store subscriber and fully (re)paints the door
+ * (wooden surface, room number plate and placed decals) from the cm-only state.
+ * The decal gallery lives in a modal opened from a floating action button, so
+ * the door stays the focus on mobile; PNG uploads register runtime decals.
  *
  * cm is the single source of truth. The preview is proportional via
  * geometry.PX_PER_CM (NO CSS transform zoom), so pointer px deltas map back to
@@ -67,18 +69,29 @@
     return node;
   }
 
-  // Render an inline SVG string into a host element without using innerHTML in
-  // a way that could trip up older engines. The catalog SVGs are owned, static,
-  // trusted strings, so assigning innerHTML is safe and keeps the markup intact.
-  function setSvg(host, svgString) {
-    host.innerHTML = svgString || '';
+  // Render a decal's artwork into a host element. Bundled glyphs are trusted,
+  // static inline SVG strings (assigning innerHTML keeps the markup intact).
+  // User uploads are raster decals (kind 'image') rendered as an <img> whose
+  // src is a data-URL, so untrusted bytes never reach innerHTML.
+  function paintDecalArt(doc, host, entry) {
+    host.innerHTML = '';
+    if (!entry) return;
+    if (entry.kind === 'image' && entry.image) {
+      var img = doc.createElement('img');
+      img.src = entry.image;
+      img.alt = '';
+      img.setAttribute('draggable', 'false');
+      host.appendChild(img);
+    } else if (entry.svg) {
+      host.innerHTML = entry.svg;
+    }
   }
 
   // --- Render ---------------------------------------------------------------
   // A render context holds the resolved DOM refs and interaction wiring for one
   // initApp() call, so multiple instances (e.g. tests) never collide.
 
-  function createView(rootDoc, store) {
+  function createView(rootDoc, store, persistence) {
     var geo = getGeometry();
     var doc = rootDoc || (typeof document !== 'undefined' ? document : null);
     if (!doc) return null;
@@ -89,6 +102,12 @@
     var btnPrint = doc.getElementById('btn-print');
     var btnReset = doc.getElementById('btn-reset');
 
+    var modalEl = doc.getElementById('decal-modal');
+    var fabEl = doc.getElementById('fab-decals');
+    var btnUpload = doc.getElementById('btn-upload');
+    var fileInput = doc.getElementById('file-upload');
+    var toastEl = doc.getElementById('toast');
+
     var PX_PER_CM = geo ? geo.PX_PER_CM : (620 / 190);
 
     function cmToPx(cm) {
@@ -98,37 +117,85 @@
       return geo ? geo.previewPxToCm(px) : px / PX_PER_CM;
     }
 
-    // -- Gallery (built once; static catalog) --------------------------------
+    // -- Toast ---------------------------------------------------------------
+    var toastTimer = null;
+    function showToast(message) {
+      if (!toastEl) return;
+      toastEl.textContent = message;
+      toastEl.hidden = false;
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () {
+        toastEl.hidden = true;
+        toastTimer = null;
+      }, 1600);
+    }
+
+    // -- Gallery (rebuilt when the catalog changes, e.g. after an upload) -----
+    var CATEGORY_TITLES = [
+      { key: 'character', title: 'Characters' },
+      { key: 'celebration', title: 'Celebration' },
+      { key: 'number', title: 'Numbers' },
+      { key: 'custom', title: 'Your uploads' }
+    ];
+
+    function makeThumb(entry) {
+      var thumb = el(doc, 'button', {
+        'type': 'button',
+        'class': 'gallery-thumb',
+        'data-type': entry.type,
+        'aria-label': 'Add ' + entry.label,
+        'title': 'Add ' + entry.label + ' (about ' + entry.realWidthCm + ' cm wide)'
+      });
+      var art = el(doc, 'span', { 'class': 'gallery-thumb-art', 'aria-hidden': 'true' });
+      paintDecalArt(doc, art, entry);
+      var label = el(doc, 'span', { 'class': 'gallery-thumb-label' }, entry.label);
+      thumb.appendChild(art);
+      thumb.appendChild(label);
+      thumb.addEventListener('click', function () {
+        store.addDecal(entry.type);
+        showToast('Added ' + entry.label);
+        thumb.classList.add('just-added');
+        setTimeout(function () { thumb.classList.remove('just-added'); }, 600);
+      });
+      return thumb;
+    }
+
     function renderGallery() {
       if (!galleryEl) return;
       var cat = getCatalogModule();
       var entries = (cat && typeof cat.getCatalog === 'function') ? cat.getCatalog() : [];
-      galleryEl.innerHTML = '';
+      var byCategory = {};
       entries.forEach(function (entry) {
-        var thumb = el(doc, 'button', {
-          'type': 'button',
-          'class': 'gallery-thumb',
-          'data-type': entry.type,
-          'role': 'listitem',
-          'aria-label': 'Add ' + entry.label,
-          'title': 'Add ' + entry.label + ' (about ' + entry.realWidthCm + ' cm wide)'
-        });
-        var art = el(doc, 'span', { 'class': 'gallery-thumb-art', 'aria-hidden': 'true' });
-        setSvg(art, entry.svg);
-        var label = el(doc, 'span', { 'class': 'gallery-thumb-label' }, entry.label);
-        thumb.appendChild(art);
-        thumb.appendChild(label);
-        thumb.addEventListener('click', function () {
-          store.addDecal(entry.type);
-        });
-        galleryEl.appendChild(thumb);
+        var c = entry.category || 'celebration';
+        (byCategory[c] = byCategory[c] || []).push(entry);
+      });
+
+      galleryEl.innerHTML = '';
+      CATEGORY_TITLES.forEach(function (group) {
+        var items = byCategory[group.key] || [];
+        // Always show the uploads group (with a hint when empty) so the feature
+        // is discoverable; skip other groups only if somehow empty.
+        if (!items.length && group.key !== 'custom') return;
+
+        var section = el(doc, 'div', { 'class': 'gallery-group' });
+        section.appendChild(el(doc, 'h3', { 'class': 'gallery-group-title' }, group.title));
+
+        if (!items.length) {
+          section.appendChild(el(doc, 'p', { 'class': 'gallery-empty' },
+            'No uploads yet - tap "Upload PNG" to add your own art.'));
+        } else {
+          var grid = el(doc, 'div', { 'class': 'gallery-grid' });
+          items.forEach(function (entry) { grid.appendChild(makeThumb(entry)); });
+          section.appendChild(grid);
+        }
+        galleryEl.appendChild(section);
       });
     }
 
-    // -- Door + placed decals (re-rendered on every state change) ------------
+    // -- Door surface, room number plate + placed decals ---------------------
     function renderDoor(state) {
       if (!canvasEl) return;
-      var door = state.door || { widthCm: 66, heightCm: 190 };
+      var door = state.door || { widthCm: 66, heightCm: 190, roomNumber: '' };
 
       // Size the door surface to the proportional preview. cm is the source of
       // truth; this is the only place cm becomes px, with no zoom transform.
@@ -136,6 +203,14 @@
       canvasEl.style.height = cmToPx(door.heightCm) + 'px';
 
       canvasEl.innerHTML = '';
+
+      // Decorative wooden layers (behind everything, never intercept pointers).
+      canvasEl.appendChild(el(doc, 'div', { 'class': 'door-grain', 'aria-hidden': 'true' }));
+      canvasEl.appendChild(el(doc, 'div', { 'class': 'door-panel door-panel-top', 'aria-hidden': 'true' }));
+      canvasEl.appendChild(el(doc, 'div', { 'class': 'door-panel door-panel-bottom', 'aria-hidden': 'true' }));
+
+      // Room number plate (the unusable keep-out zone made visible).
+      canvasEl.appendChild(buildPlate(door));
 
       (state.decals || []).forEach(function (decal) {
         var aspect = aspectFor(decal.type);
@@ -156,32 +231,95 @@
 
         var entry = getCatalogEntry(decal.type);
         var art = el(doc, 'div', { 'class': 'placed-decal-art', 'aria-hidden': 'true' });
-        setSvg(art, entry ? entry.svg : '');
+        paintDecalArt(doc, art, entry);
         node.appendChild(art);
 
-        // Resize handle only matters when selected, but ship it always so the
-        // affordance is discoverable; CSS reveals it on the selected decal.
+        // Delete (top-left) and resize (bottom-right) handles. CSS reveals them
+        // only on the selected decal.
+        var del = el(doc, 'div', {
+          'class': 'delete-handle',
+          'role': 'button',
+          'aria-label': 'Remove ' + (entry ? entry.label : 'decal'),
+          'title': 'Remove'
+        }, '×');
         var handle = el(doc, 'div', {
           'class': 'resize-handle',
           'role': 'slider',
           'aria-label': 'Resize ' + (entry ? entry.label : 'decal'),
           'title': 'Drag to resize'
         });
+        node.appendChild(del);
         node.appendChild(handle);
 
-        wireDecalPointer(node, handle, decal, door);
+        wireDecalPointer(node, handle, del, decal, door);
         canvasEl.appendChild(node);
       });
     }
 
-    // -- Interaction: pointer drag (move) + handle drag (resize) -------------
-    function wireDecalPointer(node, handle, decal, door) {
-      // Select on press (pointerdown) so the user gets immediate feedback even
-      // before any drag movement.
+    // Build the circular room number plate, sized + positioned in cm. The number
+    // is editable inline and committed to the store on blur (a single emit), so
+    // typing never triggers a re-render that would steal focus.
+    function buildPlate(door) {
+      var rect = (geo && typeof geo.getPlateRect === 'function')
+        ? geo.getPlateRect(door)
+        : { xCm: door.widthCm / 2 - 9, yCm: 21, diameterCm: 18 };
+      var sizePx = cmToPx(rect.diameterCm);
+
+      var plate = el(doc, 'div', { 'class': 'door-plate', 'title': 'Room number - tap to edit' });
+      plate.style.left = cmToPx(rect.xCm) + 'px';
+      plate.style.top = cmToPx(rect.yCm) + 'px';
+      plate.style.width = sizePx + 'px';
+      plate.style.height = sizePx + 'px';
+
+      var label = el(doc, 'span', { 'class': 'plate-label', 'aria-hidden': 'true' }, 'Stateroom');
+      label.style.fontSize = Math.max(5, sizePx * 0.11) + 'px';
+
+      var number = el(doc, 'span', {
+        'class': 'plate-number',
+        'contenteditable': 'true',
+        'role': 'textbox',
+        'aria-label': 'Room number',
+        'spellcheck': 'false',
+        'inputmode': 'numeric'
+      }, door.roomNumber || '');
+      number.style.fontSize = Math.max(9, sizePx * 0.3) + 'px';
+
+      // Keep edits short and free of newlines while typing.
+      number.addEventListener('input', function () {
+        var t = number.textContent.replace(/\s+/g, ' ');
+        if (t.length > 12) {
+          number.textContent = t.slice(0, 12);
+          placeCaretAtEnd(number);
+        }
+      });
+      number.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); number.blur(); }
+      });
+      number.addEventListener('blur', function () {
+        store.setRoomNumber(number.textContent.trim());
+      });
+
+      plate.appendChild(label);
+      plate.appendChild(number);
+      return plate;
+    }
+
+    function placeCaretAtEnd(node) {
+      if (typeof doc.createRange !== 'function' || !rootWin || !rootWin.getSelection) return;
+      var range = doc.createRange();
+      range.selectNodeContents(node);
+      range.collapse(false);
+      var sel = rootWin.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    var rootWin = (typeof window !== 'undefined') ? window : null;
+
+    // -- Interaction: pointer drag (move) + handle drag (resize) + delete ----
+    function wireDecalPointer(node, handle, del, decal, door) {
       node.addEventListener('pointerdown', function (ev) {
-        // Ignore clicks that originate on the resize handle here; the handle has
-        // its own listener that stops propagation.
-        if (ev.target === handle) return;
+        // The handles have their own listeners; ignore presses that start there.
+        if (ev.target === handle || ev.target === del) return;
         ev.preventDefault();
         store.selectDecal(decal.id);
         beginDrag(ev, decal, door);
@@ -192,6 +330,12 @@
         ev.stopPropagation();
         store.selectDecal(decal.id);
         beginResize(ev, decal, door);
+      });
+
+      del.addEventListener('pointerdown', function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        store.removeDecal(decal.id);
       });
     }
 
@@ -204,8 +348,6 @@
       function onMove(ev) {
         var dxPx = ev.clientX - startX;
         var dyPx = ev.clientY - startY;
-        // No zoom factor: the preview has no CSS transform, so px deltas convert
-        // straight to cm. The store clamps to the door bounds.
         store.moveDecal(decal.id, originX + pxToCm(dxPx), originY + pxToCm(dyPx));
       }
       function onUp() {
@@ -224,8 +366,6 @@
 
       function onMove(ev) {
         var dxPx = ev.clientX - startX;
-        // Width tracks horizontal drag in true door-proportion cm; the store
-        // preserves aspect (height derived) and clamps to the door.
         var nextWidthCm = originWidthCm + pxToCm(dxPx);
         if (nextWidthCm < 1) nextWidthCm = 1; // keep it grabbable
         store.resizeDecal(decal.id, nextWidthCm);
@@ -240,12 +380,94 @@
       doc.addEventListener('pointercancel', onUp, true);
     }
 
-    // -- Canvas background click deselects -----------------------------------
+    // -- Canvas background press deselects (ignore decorative children) -------
     if (canvasEl) {
       canvasEl.addEventListener('pointerdown', function (ev) {
-        if (ev.target === canvasEl) {
+        var t = ev.target;
+        if (t === canvasEl ||
+            (t.classList && (t.classList.contains('door-grain') || t.classList.contains('door-panel')))) {
           store.selectDecal(null);
         }
+      });
+    }
+
+    // -- Modal (decal picker) ------------------------------------------------
+    function openModal() {
+      if (!modalEl) return;
+      modalEl.hidden = false;
+      if (rootWin && doc.body) doc.body.style.overflow = 'hidden';
+      var closeBtn = doc.getElementById('modal-close');
+      if (closeBtn) closeBtn.focus();
+    }
+    function closeModal() {
+      if (!modalEl) return;
+      modalEl.hidden = true;
+      if (doc.body) doc.body.style.overflow = '';
+      if (fabEl) fabEl.focus();
+    }
+
+    if (fabEl) fabEl.addEventListener('click', openModal);
+    if (modalEl) {
+      modalEl.addEventListener('click', function (ev) {
+        if (ev.target && ev.target.getAttribute && ev.target.getAttribute('data-close') === 'true') {
+          closeModal();
+        }
+      });
+    }
+    doc.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && modalEl && !modalEl.hidden) closeModal();
+    });
+
+    // -- Upload PNG / image as a custom decal --------------------------------
+    var uploadSeq = 0;
+    function handleFiles(fileList) {
+      var cat = getCatalogModule();
+      if (!cat || typeof cat.registerCustomDecal !== 'function') return;
+      var files = Array.prototype.slice.call(fileList || []);
+      files.forEach(function (file) {
+        if (!file || !file.type || file.type.indexOf('image/') !== 0) {
+          showToast('Skipped a non-image file');
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+          var dataUrl = reader.result;
+          if (typeof dataUrl !== 'string') return;
+          var probe = new Image();
+          probe.onload = function () {
+            var w = probe.naturalWidth || probe.width || 1;
+            var h = probe.naturalHeight || probe.height || 1;
+            var aspect = (w > 0) ? (h / w) : 1;
+            uploadSeq += 1;
+            var type = 'custom-' + Date.now().toString(36) + '-' + uploadSeq;
+            var label = (file.name || 'Upload').replace(/\.[^.]+$/, '').slice(0, 18) || 'Upload';
+            cat.registerCustomDecal({
+              type: type,
+              label: label,
+              image: dataUrl,
+              aspectRatio: aspect,
+              realWidthCm: 15
+            });
+            if (persistence && typeof persistence.saveCustomDecals === 'function') {
+              persistence.saveCustomDecals(cat.getCustomDecals());
+            }
+            renderGallery();
+            store.addDecal(type);
+            showToast('Uploaded ' + label);
+          };
+          probe.onerror = function () { showToast('Could not read that image'); };
+          probe.src = dataUrl;
+        };
+        reader.onerror = function () { showToast('Could not read that file'); };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (btnUpload && fileInput) {
+      btnUpload.addEventListener('click', function () { fileInput.click(); });
+      fileInput.addEventListener('change', function () {
+        handleFiles(fileInput.files);
+        fileInput.value = ''; // allow re-picking the same file
       });
     }
 
@@ -311,8 +533,6 @@
         var decal = placement.decal;
         var entry = cat && cat.getCatalogEntry ? cat.getCatalogEntry(decal.type) : undefined;
 
-        // Physical mm dimensions: real-world width in cm * 10 -> mm. Height is
-        // derived from the catalog aspect ratio so artwork stays true-to-shape.
         var widthMm = isFinite(placement.widthMm)
           ? placement.widthMm
           : decal.widthCm * 10;
@@ -324,12 +544,10 @@
           : widthMm * aspect;
 
         var item = el(doc, 'div', { 'class': 'print-decal' });
-        // Deterministic verifier hooks: the claimed physical size in mm.
         item.setAttribute('data-print-width-mm', String(widthMm));
         item.setAttribute('data-print-height-mm', String(heightMm));
         item.setAttribute('data-type', decal.type);
 
-        // Layout in physical units only - no px anywhere on the print sheet.
         item.style.position = 'absolute';
         item.style.left = placement.xMm + 'mm';
         item.style.top = placement.yMm + 'mm';
@@ -337,7 +555,7 @@
         item.style.height = heightMm + 'mm';
 
         var art = el(doc, 'div', { 'class': 'print-decal-art' });
-        setSvg(art, entry ? entry.svg : '');
+        paintDecalArt(doc, art, entry);
         item.appendChild(art);
 
         area.appendChild(item);
@@ -387,9 +605,6 @@
   /**
    * Mount the print layout into #print-root and trigger the browser print
    * dialog. Guarded so headless (no window.print) stays a clean no-op.
-   *
-   * @param {object} store the active store (for current state)
-   * @param {Document} [rootDoc]
    */
   function exportPrint(store, rootDoc) {
     var doc = rootDoc || (typeof document !== 'undefined' ? document : null);
@@ -401,8 +616,6 @@
     printRoot.innerHTML = '';
     printRoot.appendChild(buildPrintLayout(state, doc));
 
-    // Guard: only call window.print when present and callable, so headless
-    // render checks (which mount the layout but have no print) stay clean.
     if (typeof window !== 'undefined' && typeof window.print === 'function') {
       try {
         window.print();
@@ -414,16 +627,14 @@
 
   // --- Bootstrap ------------------------------------------------------------
 
-  // The single live app store + its document, captured by initApp so the
-  // contract's exportPrint()->void (no args) signature can resolve them.
   var activeStore = null;
   var activeDoc = null;
 
   /**
-   * Bootstrap the app: rehydrate from persistence (falling back to the bundled
-   * sample composition so the door is DECORATED on first paint), create the
-   * store, wire persistence as a save sink, build the gallery once, subscribe
-   * the render, and paint the initial state.
+   * Bootstrap the app: re-register any uploaded custom decals, rehydrate from
+   * persistence (falling back to the bundled sample composition so the door is
+   * DECORATED on first paint), create the store, wire persistence, build the
+   * gallery, subscribe the render, and paint the initial state.
    *
    * @param {Document} [rootDoc]
    */
@@ -432,6 +643,15 @@
     if (!doc) return;
 
     var persistence = CDDS.persistence || null;
+    var catalog = getCatalogModule();
+
+    // Re-register uploaded decals BEFORE loading the composition so placements
+    // referencing a custom type survive persistence's dangling-type guard.
+    if (persistence && typeof persistence.loadCustomDecals === 'function' &&
+        catalog && typeof catalog.registerCustomDecal === 'function') {
+      var customs = persistence.loadCustomDecals();
+      customs.forEach(function (entry) { catalog.registerCustomDecal(entry); });
+    }
 
     // Rehydrate, else seed from the sample so we never show an empty shell.
     var initial = null;
@@ -445,11 +665,10 @@
     if (typeof CDDS.createStore !== 'function') return;
     var store = CDDS.createStore(initial || undefined);
 
-    // Capture for the no-arg exportPrint()->void contract entry point.
     activeStore = store;
     activeDoc = doc;
 
-    var view = createView(doc, store);
+    var view = createView(doc, store, persistence);
     if (!view) return;
 
     view.renderGallery();
@@ -472,9 +691,6 @@
 
   // --- Public API -----------------------------------------------------------
 
-  // Contract entry point: exportPrint()->void with no args. It resolves the
-  // live store captured by initApp; if called with an explicit store (internal
-  // button handler), that takes precedence.
   function exportPrintPublic(store, rootDoc) {
     var s = store || activeStore;
     var d = rootDoc || activeDoc;

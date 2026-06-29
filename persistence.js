@@ -24,6 +24,7 @@
   var CDDS = root.CDDS = root.CDDS || {};
 
   var STORAGE_KEY = 'cdds.composition.v1';
+  var CUSTOM_KEY = 'cdds.customDecals.v1';
   var SCHEMA_VERSION = 1;
   var SAVE_DEBOUNCE_MS = 250;
 
@@ -100,7 +101,10 @@
       ? raw.widthCm : DEFAULT_DOOR_W_CM;
     var heightCm = (raw && isFiniteNumber(raw.heightCm) && raw.heightCm > 0)
       ? raw.heightCm : DEFAULT_DOOR_H_CM;
-    return { widthCm: widthCm, heightCm: heightCm };
+    var roomNumber = (raw && typeof raw.roomNumber === 'string') ? raw.roomNumber : '';
+    // Keep the persisted room number short and free of control characters.
+    roomNumber = roomNumber.replace(/[^0-9A-Za-z -]/g, '').trim().slice(0, 12);
+    return { widthCm: widthCm, heightCm: heightCm, roomNumber: roomNumber };
   }
 
   /**
@@ -228,17 +232,85 @@
     saveTimer = root.setTimeout(flushSave, SAVE_DEBOUNCE_MS);
   }
 
+  // --- custom (uploaded) decal definitions ---------------------------------
+  // Stored separately from the composition: these are the decal DEFINITIONS
+  // (type + label + image data-URL + sizing), not placements. They are loaded
+  // and re-registered into the catalog BEFORE the composition is rehydrated, so
+  // placements that reference a custom type survive the dangling-type guard.
+
+  function sanitizeCustomDecal(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    if (typeof raw.type !== 'string' || raw.type === '') return null;
+    if (typeof raw.image !== 'string' || raw.image.indexOf('data:') !== 0) return null;
+    if (!isFiniteNumber(raw.aspectRatio) || raw.aspectRatio <= 0) return null;
+    var width = (isFiniteNumber(raw.realWidthCm) && raw.realWidthCm > 0) ? raw.realWidthCm : 15;
+    return {
+      type: raw.type,
+      label: (typeof raw.label === 'string' && raw.label) ? raw.label : 'Upload',
+      image: raw.image,
+      realWidthCm: width,
+      aspectRatio: raw.aspectRatio
+    };
+  }
+
+  function loadCustomDecals() {
+    var storage = getStorage();
+    if (!storage) return [];
+    var raw;
+    try {
+      raw = storage.getItem(CUSTOM_KEY);
+    } catch (e) {
+      return [];
+    }
+    if (!raw) return [];
+    var parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      return [];
+    }
+    if (!Array.isArray(parsed)) return [];
+    var out = [];
+    for (var i = 0; i < parsed.length; i++) {
+      var clean = sanitizeCustomDecal(parsed[i]);
+      if (clean) out.push(clean);
+    }
+    return out;
+  }
+
+  function saveCustomDecals(list) {
+    var storage = getStorage();
+    if (!storage) return;
+    var arr = Array.isArray(list) ? list : [];
+    var clean = [];
+    for (var i = 0; i < arr.length; i++) {
+      var c = sanitizeCustomDecal(arr[i]);
+      if (c) clean.push(c);
+    }
+    try {
+      storage.setItem(CUSTOM_KEY, JSON.stringify(clean));
+    } catch (e) {
+      // Quota (data-URLs can be large) / disabled storage: best-effort only.
+    }
+  }
+
   CDDS.persistence = {
     STORAGE_KEY: STORAGE_KEY,
+    CUSTOM_KEY: CUSTOM_KEY,
     loadComposition: loadComposition,
-    saveComposition: saveComposition
+    saveComposition: saveComposition,
+    loadCustomDecals: loadCustomDecals,
+    saveCustomDecals: saveCustomDecals
   };
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
       STORAGE_KEY: STORAGE_KEY,
+      CUSTOM_KEY: CUSTOM_KEY,
       loadComposition: loadComposition,
-      saveComposition: saveComposition
+      saveComposition: saveComposition,
+      loadCustomDecals: loadCustomDecals,
+      saveCustomDecals: saveCustomDecals
     };
   }
 })(typeof window !== 'undefined' ? window : this);

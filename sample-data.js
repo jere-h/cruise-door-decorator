@@ -42,14 +42,29 @@
   function sampleComposition() {
     return {
       schemaVersion: 1,
-      door: { widthCm: DOOR_W_CM, heightCm: DOOR_H_CM },
+      door: { widthCm: DOOR_W_CM, heightCm: DOOR_H_CM, roomNumber: '8024' },
       decals: [
-        // Banner ribbon greeting across the upper third of the door.
+        // Character fan-art flanking the room number plate up top.
+        {
+          id: 'sample-mouse',
+          type: 'mouse',
+          xCm: 5,
+          yCm: 5,
+          widthCm: 16
+        },
+        {
+          id: 'sample-star',
+          type: 'star',
+          xCm: 47,
+          yCm: 6,
+          widthCm: 14
+        },
+        // Banner ribbon greeting just below the plate.
         {
           id: 'sample-banner',
           type: 'banner',
           xCm: 8,
-          yCm: 24,
+          yCm: 46,
           widthCm: 50
         },
         // Heart centerpiece, horizontally centered (door 66cm, heart 22cm -> left 22).
@@ -57,23 +72,31 @@
           id: 'sample-heart',
           type: 'heart',
           xCm: 22,
-          yCm: 70,
+          yCm: 74,
           widthCm: 22
         },
         // Milestone numerals "50", side by side and centered below the heart.
         {
           id: 'sample-numeral-5',
-          type: 'numeral-5',
+          type: 'num-5',
           xCm: 21,
-          yCm: 112,
-          widthCm: 11
+          yCm: 106,
+          widthCm: 12
         },
         {
           id: 'sample-numeral-0',
-          type: 'numeral-0',
+          type: 'num-0',
           xCm: 34,
-          yCm: 112,
-          widthCm: 11
+          yCm: 106,
+          widthCm: 12
+        },
+        // A little castle anchoring the lower third of the door.
+        {
+          id: 'sample-castle',
+          type: 'castle',
+          xCm: 20,
+          yCm: 150,
+          widthCm: 26
         }
       ],
       selectedId: null

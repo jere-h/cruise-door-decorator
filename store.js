@@ -52,7 +52,8 @@
     var geo = getGeometry();
     return {
       widthCm: geo ? geo.DOOR_W_CM : 66,
-      heightCm: geo ? geo.DOOR_H_CM : 190
+      heightCm: geo ? geo.DOOR_H_CM : 190,
+      roomNumber: ''
     };
   }
 
@@ -79,7 +80,8 @@
       schemaVersion: 1,
       door: {
         widthCm: Number.isFinite(door.widthCm) && door.widthCm > 0 ? door.widthCm : fallback.widthCm,
-        heightCm: Number.isFinite(door.heightCm) && door.heightCm > 0 ? door.heightCm : fallback.heightCm
+        heightCm: Number.isFinite(door.heightCm) && door.heightCm > 0 ? door.heightCm : fallback.heightCm,
+        roomNumber: typeof door.roomNumber === 'string' ? door.roomNumber : ''
       },
       decals: normalizedDecals,
       selectedId: typeof src.selectedId === 'string' ? src.selectedId : null
@@ -256,6 +258,17 @@
       }
     }
 
+    function setRoomNumber(value) {
+      var next = (value === null || value === undefined) ? '' : String(value);
+      if (state.door.roomNumber === next) return;
+      state.door = {
+        widthCm: state.door.widthCm,
+        heightCm: state.door.heightCm,
+        roomNumber: next
+      };
+      emit();
+    }
+
     function removeDecal(id) {
       var before = state.decals.length;
       state.decals = state.decals.filter(function (d) { return d.id !== id; });
@@ -285,6 +298,7 @@
       resizeDecal: resizeDecal,
       selectDecal: selectDecal,
       removeDecal: removeDecal,
+      setRoomNumber: setRoomNumber,
       reset: reset
     };
   }

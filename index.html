@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cruise Door Decal Studio</title>
+  <meta name="description" content="Compose a cruise stateroom door layout from generic owned decals and print a true-to-size, A4-paginated cutout sheet.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <div class="app-header-inner">
+        <h1 class="app-title">Cruise Door Decal Studio</h1>
+        <p class="app-note">
+          The on-screen door is shown at a proportional scale so you can compose your layout.
+          Only the printed A4 sheet at 100% is true-to-size. Drop decals on the door, drag and resize
+          them, then print the cutout sheet to scale.
+        </p>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <aside class="rail" aria-label="Decal gallery and tools">
+        <section class="rail-section">
+          <div class="rail-head">
+            <h2 class="rail-title">Decals</h2>
+            <p class="rail-hint">Tap a decal to add it to the door.</p>
+          </div>
+          <div id="gallery" class="gallery" role="list" aria-label="Available decals"></div>
+        </section>
+
+        <section class="rail-section rail-actions">
+          <h2 class="rail-title">Output</h2>
+          <p class="rail-hint">
+            Print the layout as a true-to-size A4 cutout sheet. Set your printer to 100% and turn off
+            Fit to Page.
+          </p>
+          <button id="btn-print" type="button" class="btn btn-primary">Print cutout sheet</button>
+          <button id="btn-reset" type="button" class="btn btn-secondary">Reset door</button>
+        </section>
+      </aside>
+
+      <section class="canvas-area" aria-label="Door preview">
+        <div class="canvas-wrap">
+          <div id="door-canvas" class="door-canvas" aria-label="Stateroom door preview"></div>
+          <p id="door-caption" class="door-caption">
+            Represented door: about 66 cm wide by 190 cm tall. The screen preview is proportional only -
+            sizes and positions are stored in centimetres. The printed sheet at 100% (Fit to Page off)
+            is the only true-to-size output.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <div id="print-root" aria-hidden="true"></div>
+  </div>
+
+  <script src="geometry.js"></script>
+  <script src="catalog.js"></script>
+  <script src="store.js"></script>
+  <script src="persistence.js"></script>
+  <script src="sample-data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.CDDS && typeof window.CDDS.initApp === 'function') {
+        window.CDDS.initApp(document);
+      }
+    });
+  </script>
+</body>
+</html>

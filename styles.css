@@ -13,6 +13,13 @@
   --color-accent: #1f6feb;
   --color-accent-contrast: #ffffff;
 
+  /* Door (light beige wood) palette */
+  --wood-light: #ecd6b0;
+  --wood-mid: #e0c699;
+  --wood-dark: #cdb281;
+  --wood-edge: #b2966a;
+  --wood-seam: rgba(120, 90, 50, 0.18);
+
   /* Spacing scale */
   --space-1: 4px;
   --space-2: 8px;
@@ -36,6 +43,7 @@
   /* Elevation */
   --shadow-1: 0 1px 2px rgba(27, 39, 51, .08);
   --shadow-2: 0 4px 12px rgba(27, 39, 51, .12);
+  --shadow-3: 0 12px 32px rgba(27, 39, 51, .22);
 }
 
 /* ---- Global reset ---- */
@@ -109,25 +117,31 @@ figcaption,
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   box-shadow: var(--shadow-1);
-  padding: var(--space-4) var(--space-4);
+  padding: var(--space-4);
+}
+
+.app-header-inner {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
 }
 
-.app-header h1 {
+.app-title {
   font-size: var(--text-xl);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 
-.app-header .header-note {
+.app-note {
   color: var(--color-muted);
   font-size: var(--text-sm);
-  max-width: 60ch;
+  max-width: 64ch;
 }
 
-.app-header .header-actions {
+.app-header-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -164,41 +178,369 @@ figcaption,
   border-color: #1a5fd0;
 }
 
-/* Main work area: mobile = stacked (gallery above door) */
+/* Main work area: the door is the focus on every screen size. */
 .app-main {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  align-items: center;
   padding: var(--space-4);
   width: 100%;
   flex: 1 1 auto;
 }
 
-/* ---- Gallery rail ---- */
-.tool-rail {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-1);
-  padding: var(--space-4);
+/* ---- Door canvas region ---- */
+.canvas-region {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
   width: 100%;
+  max-width: 720px;
 }
 
-.tool-rail h2 {
-  font-size: var(--text-lg);
+.canvas-frame {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  overflow: auto;
+  padding: var(--space-3);
+}
+
+/* The door: a light beige wooden stateroom door with recessed panels. */
+#door-canvas {
+  position: relative;
+  flex: 0 0 auto;
+  max-width: 100%;
+  border-radius: 12px;
+  background-color: var(--wood-mid);
+  border: 3px solid var(--wood-edge);
+  box-shadow:
+    var(--shadow-3),
+    inset 0 0 0 2px rgba(255, 255, 255, .25);
+  touch-action: none;
+}
+
+/* Wood grain + vertical plank seams. Decorative, never intercepts pointers. */
+.door-grain {
+  position: absolute;
+  inset: 0;
+  border-radius: 9px;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    /* soft vertical grain streaks */
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, .05) 0 3px,
+      rgba(120, 90, 50, .05) 3px 7px,
+      transparent 7px 14px
+    ),
+    /* a few plank seams */
+    linear-gradient(90deg, transparent 0 32%, var(--wood-seam) 32% 32.5%, transparent 33%),
+    linear-gradient(90deg, transparent 0 66%, var(--wood-seam) 66% 66.5%, transparent 67%),
+    /* base vertical sheen */
+    linear-gradient(180deg, var(--wood-light), var(--wood-mid) 55%, var(--wood-dark));
+}
+
+/* Recessed door panels for a real stateroom-door look. */
+.door-panel {
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(180deg, #e9d3ad, #d8bd8d);
+  border: 1px solid rgba(150, 120, 80, .55);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, .22),
+    inset 0 3px 8px rgba(120, 90, 50, .25),
+    0 1px 0 rgba(255, 255, 255, .35);
+}
+
+.door-panel-top {
+  top: 3.5%;
+  height: 32%;
+}
+
+.door-panel-bottom {
+  top: 38%;
+  bottom: 3.5%;
+}
+
+/* Circular brushed-metal room number plate (the unusable keep-out zone). */
+.door-plate {
+  position: absolute;
+  z-index: 2;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #5a3e12;
+  background:
+    radial-gradient(circle at 35% 30%, #fbe9bf 0%, #e7c25e 45%, #c89a33 78%, #a9842b 100%);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, .35),
+    inset 0 0 0 3px rgba(255, 255, 255, .45),
+    inset 0 0 0 6px rgba(150, 110, 30, .55);
+}
+
+.door-plate .plate-label {
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  opacity: .75;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.door-plate .plate-number {
+  font-family: Georgia, 'Times New Roman', serif;
   font-weight: 700;
+  line-height: 1;
+  outline: none;
+  min-width: 1ch;
+}
+
+.door-plate .plate-number:empty::before {
+  content: 'Room';
+  opacity: .5;
+}
+
+.door-plate .plate-number:focus {
+  text-decoration: underline dotted;
+}
+
+#door-caption {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+  max-width: 56ch;
+}
+
+/* ---- Placed decals on the door ---- */
+.placed-decal {
+  position: absolute;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  z-index: 3;
+}
+
+.placed-decal:active {
+  cursor: grabbing;
+}
+
+.placed-decal-art,
+.placed-decal svg,
+.placed-decal img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+.placed-decal.is-selected {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  z-index: 6;
+}
+
+.placed-decal .resize-handle {
+  position: absolute;
+  right: -11px;
+  bottom: -11px;
+  width: 22px;
+  height: 22px;
+  background: var(--color-accent);
+  border: 2px solid var(--color-accent-contrast);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-1);
+  cursor: nwse-resize;
+  display: none;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.placed-decal .delete-handle {
+  position: absolute;
+  left: -11px;
+  top: -11px;
+  width: 22px;
+  height: 22px;
+  background: #e3506a;
+  color: #ffffff;
+  border: 2px solid var(--color-accent-contrast);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-1);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.placed-decal.is-selected .resize-handle,
+.placed-decal.is-selected .delete-handle {
+  display: flex;
+}
+
+/* ============================================================
+   FLOATING ACTION BUTTON (opens the decal modal)
+   ============================================================ */
+.fab {
+  position: fixed;
+  right: max(var(--space-4), env(safe-area-inset-right));
+  bottom: max(var(--space-5), env(safe-area-inset-bottom));
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: var(--text-base);
+  font-weight: 700;
+  box-shadow: var(--shadow-2);
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+}
+
+.fab:hover {
+  background: #1a5fd0;
+  box-shadow: var(--shadow-3);
+}
+
+.fab:active {
+  transform: translateY(1px);
+}
+
+.fab-icon {
+  font-size: 1.4em;
+  line-height: 1;
+  font-weight: 400;
+}
+
+/* ============================================================
+   DECAL PICKER MODAL
+   ============================================================ */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 32, .5);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.modal-sheet {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 640px;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  box-shadow: var(--shadow-3);
+  padding: var(--space-4) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+  animation: sheet-rise .18s ease-out;
+}
+
+@keyframes sheet-rise {
+  from { transform: translateY(16px); opacity: .6; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
 
-.tool-rail .rail-hint {
-  color: var(--color-muted);
-  font-size: var(--text-sm);
+.modal-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.modal-close {
+  border: none;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  font-size: 1.4rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close:hover {
+  background: #e7edf4;
+}
+
+.modal-tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
 
-#gallery {
+.btn-upload {
+  align-self: flex-start;
+}
+
+.modal-tools-hint {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+/* Scrollable gallery inside the modal */
+.gallery {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-right: var(--space-1);
+}
+
+.gallery-group + .gallery-group {
+  margin-top: var(--space-4);
+}
+
+.gallery-group-title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--color-muted);
+  margin-bottom: var(--space-2);
+}
+
+.gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   gap: var(--space-3);
 }
 
@@ -223,138 +565,90 @@ figcaption,
   transform: translateY(1px);
 }
 
-.gallery-thumb svg,
-.gallery-thumb img {
+.gallery-thumb.just-added {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(31, 111, 235, .25);
+}
+
+.gallery-thumb-art {
   width: 100%;
-  height: 48px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gallery-thumb-art svg,
+.gallery-thumb-art img {
+  width: 100%;
+  height: 54px;
   object-fit: contain;
 }
 
-.gallery-thumb .thumb-label {
+.gallery-thumb-label {
   font-size: var(--text-sm);
   color: var(--color-muted);
   text-align: center;
   line-height: 1.2;
 }
 
-/* ---- Door canvas region ---- */
-.canvas-region {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-  width: 100%;
-}
-
-.canvas-frame {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  overflow: auto;
-  padding: var(--space-2);
-}
-
-#door-canvas {
-  position: relative;
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2);
-  flex: 0 0 auto;
-  max-width: 100%;
-  /* Door handle hint - a restrained nautical touch */
-  background-image:
-    radial-gradient(circle at 88% 50%, rgba(31, 111, 235, .10) 0 9px, transparent 10px);
-  touch-action: none;
-}
-
-#door-caption {
+.gallery-empty {
   color: var(--color-muted);
   font-size: var(--text-sm);
-  text-align: center;
-  max-width: 48ch;
-}
-
-/* ---- Placed decals on the door ---- */
-.placed-decal {
-  position: absolute;
-  cursor: grab;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
-}
-
-.placed-decal:active {
-  cursor: grabbing;
-}
-
-.placed-decal svg,
-.placed-decal img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  pointer-events: none;
-}
-
-.placed-decal.is-selected {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-  z-index: 5;
-}
-
-.placed-decal .resize-handle {
-  position: absolute;
-  right: -8px;
-  bottom: -8px;
-  width: 16px;
-  height: 16px;
-  background: var(--color-accent);
-  border: 2px solid var(--color-accent-contrast);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-1);
-  cursor: nwse-resize;
-  display: none;
-  pointer-events: auto;
-  touch-action: none;
-}
-
-.placed-decal.is-selected .resize-handle {
-  display: block;
+  padding: var(--space-2) 0;
 }
 
 /* ============================================================
-   WIDER BREAKPOINTS: gallery moves to a side rail
+   TOAST
+   ============================================================ */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(max(var(--space-5), env(safe-area-inset-bottom)) + 64px);
+  transform: translateX(-50%);
+  z-index: 60;
+  background: rgba(27, 39, 51, .94);
+  color: #ffffff;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+/* ============================================================
+   WIDER BREAKPOINTS
    ============================================================ */
 @media (min-width: 760px) {
   .app-main {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: var(--space-6);
     padding: var(--space-5);
   }
 
-  .tool-rail {
-    width: 280px;
-    flex: 0 0 280px;
-    position: sticky;
-    top: var(--space-5);
+  /* Center the modal as a card on larger viewports. */
+  .modal {
+    align-items: center;
   }
 
-  .canvas-region {
-    flex: 1 1 auto;
+  .modal-sheet {
+    border-radius: var(--radius-md);
+    max-height: 80vh;
   }
 }
 
 @media (min-width: 1100px) {
-  .app-header {
+  .app-header-inner {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
   }
 
-  .app-header .header-text {
+  .app-header-text {
     flex: 1 1 auto;
   }
 }
@@ -378,7 +672,7 @@ figcaption,
 
 @media print {
   /* Hide the whole screen app; show only the print sheet. */
-  #app {
+  #app > *:not(#print-root) {
     display: none !important;
   }
 
@@ -421,9 +715,7 @@ figcaption,
     font-size: 9pt;
   }
 
-  /* Calibration ruler - a known physical length to verify scale.
-     Marked at 1cm intervals over 10cm; if it does not measure 10cm
-     with a real ruler, the print was scaled. */
+  /* Calibration ruler - a known physical length to verify scale. */
   .print-ruler {
     position: relative;
     width: 100mm;
@@ -457,6 +749,7 @@ figcaption,
     box-sizing: border-box;
   }
 
+  .print-decal-art,
   .print-decal svg,
   .print-decal img {
     width: 100%;

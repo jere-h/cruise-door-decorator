@@ -2,56 +2,68 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Cruise Door Decal Studio</title>
-  <meta name="description" content="Compose a cruise stateroom door layout from generic owned decals and print a true-to-size, A4-paginated cutout sheet.">
+  <meta name="description" content="Compose a cruise stateroom door layout from bundled decals and printable cutouts. Mobile-friendly, with a wooden Disney-style door, room number plate, character fan-art and PNG uploads.">
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="app">
     <header class="app-header">
       <div class="app-header-inner">
-        <h1 class="app-title">Cruise Door Decal Studio</h1>
-        <p class="app-note">
-          The on-screen door is shown at a proportional scale so you can compose your layout.
-          Only the printed A4 sheet at 100% is true-to-size. Drop decals on the door, drag and resize
-          them, then print the cutout sheet to scale.
-        </p>
+        <div class="app-header-text">
+          <h1 class="app-title">Cruise Door Decal Studio</h1>
+          <p class="app-note">
+            Decorate a stateroom door, then print a true-to-size A4 cutout sheet.
+            Tap <strong>Decals</strong> to add art, then drag, resize and remove pieces on the door.
+          </p>
+        </div>
+        <div class="app-header-actions">
+          <button id="btn-print" type="button" class="btn btn-primary">Print cutout sheet</button>
+          <button id="btn-reset" type="button" class="btn btn-secondary">Reset door</button>
+        </div>
       </div>
     </header>
 
     <main class="app-main">
-      <aside class="rail" aria-label="Decal gallery and tools">
-        <section class="rail-section">
-          <div class="rail-head">
-            <h2 class="rail-title">Decals</h2>
-            <p class="rail-hint">Tap a decal to add it to the door.</p>
-          </div>
-          <div id="gallery" class="gallery" role="list" aria-label="Available decals"></div>
-        </section>
-
-        <section class="rail-section rail-actions">
-          <h2 class="rail-title">Output</h2>
-          <p class="rail-hint">
-            Print the layout as a true-to-size A4 cutout sheet. Set your printer to 100% and turn off
-            Fit to Page.
-          </p>
-          <button id="btn-print" type="button" class="btn btn-primary">Print cutout sheet</button>
-          <button id="btn-reset" type="button" class="btn btn-secondary">Reset door</button>
-        </section>
-      </aside>
-
-      <section class="canvas-area" aria-label="Door preview">
-        <div class="canvas-wrap">
+      <section class="canvas-region" aria-label="Door preview">
+        <div class="canvas-frame">
           <div id="door-canvas" class="door-canvas" aria-label="Stateroom door preview"></div>
-          <p id="door-caption" class="door-caption">
-            Represented door: about 66 cm wide by 190 cm tall. The screen preview is proportional only -
-            sizes and positions are stored in centimetres. The printed sheet at 100% (Fit to Page off)
-            is the only true-to-size output.
-          </p>
         </div>
+        <p id="door-caption" class="door-caption">
+          The on-screen door is proportional only. Sizes are stored in centimetres; the printed
+          A4 sheet at 100% (Fit to Page off) is the only true-to-size output. The circular plate up
+          top is the room number - tap it to edit, and decals stay clear of it.
+        </p>
       </section>
     </main>
+
+    <!-- Floating action button: opens the decal picker modal. -->
+    <button id="fab-decals" type="button" class="fab" aria-haspopup="dialog" aria-controls="decal-modal">
+      <span class="fab-icon" aria-hidden="true">+</span>
+      <span class="fab-label">Decals</span>
+    </button>
+
+    <!-- Decal picker modal. Hidden until the FAB is tapped. -->
+    <div id="decal-modal" class="modal" hidden>
+      <div class="modal-backdrop" data-close="true"></div>
+      <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="decal-modal-title">
+        <header class="modal-head">
+          <h2 id="decal-modal-title" class="modal-title">Add a decal</h2>
+          <button id="modal-close" type="button" class="modal-close" data-close="true" aria-label="Close decal picker">&times;</button>
+        </header>
+        <div class="modal-tools">
+          <button id="btn-upload" type="button" class="btn btn-primary btn-upload">Upload PNG&hellip;</button>
+          <input id="file-upload" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple hidden>
+          <p class="modal-tools-hint">Tap any decal to drop it on the door. Add as many as you like, then close to arrange them.</p>
+        </div>
+        <div id="gallery" class="gallery" aria-label="Available decals"></div>
+      </div>
+    </div>
+
+    <!-- Transient confirmation after adding / uploading a decal. -->
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
     <div id="print-root" aria-hidden="true"></div>
   </div>

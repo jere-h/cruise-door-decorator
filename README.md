@@ -11,11 +11,22 @@ laid out in physical CSS units — is the only thing claimed true-to-size.
 
 ## Features
 
-- Left tool/gallery rail plus a central door canvas — a restrained, functional
-  product UI.
-- Drag and resize decals at a proportionally-accurate scale against the door.
+- A mobile-first door canvas with a **light beige wooden** stateroom-door look:
+  wood grain, recessed panels and a circular brushed-metal **room number plate**.
+- The plate is an **unusable keep-out zone** in the upper middle (like a Disney
+  resort room door) — decals are automatically pushed clear of it, and you can
+  tap the plate to edit the room number.
+- A **decal picker modal** opened from a floating "＋ Decals" button: tap art to
+  drop it on the door, add as many as you like, then close to arrange them.
+- Bundled decals include original, **non-copyrighted character fan-art**
+  (mouse ears, castle, crown, fairy, magic lamp, clownfish, mermaid tail,
+  snowflake) alongside celebration glyphs and numerals.
+- **Upload your own PNG/JPEG/SVG** images as decals — they are added to the
+  gallery, placed on the door, and persisted across reloads.
+- Drag, resize and delete decals at a proportionally-accurate scale.
 - True-to-size, A4-paginated cutout sheet for printing.
-- State persists in `localStorage`, so your composition survives page reloads.
+- State persists in `localStorage`, so your composition, room number and uploaded
+  decals survive page reloads.
 - Ships pre-populated with a sample composition, so the door is showcased
   decorated on first load.
 
@@ -68,9 +79,9 @@ without running them through Jekyll.
 | ---------------- | ----------------------------------------------------------- |
 | `index.html`     | App markup and entry point.                                 |
 | `styles.css`     | Layout and styling, including the physical print stylesheet. |
-| `geometry.js`    | cm-based geometry: positions, sizes, and scale conversions. |
-| `catalog.js`     | The bundled gallery of generic owned SVG decals.            |
-| `store.js`       | In-memory composition state.                                |
-| `persistence.js` | `localStorage` load/save of the composition.               |
-| `app.js`         | UI wiring: rail, canvas, drag/resize, print.                |
+| `geometry.js`    | cm-based geometry: positions, sizes, scale, plate keep-out. |
+| `catalog.js`     | Bundled SVG decals (characters/celebration/numbers) + custom-upload registry. |
+| `store.js`       | In-memory composition state (decals + room number).        |
+| `persistence.js` | `localStorage` load/save of the composition and uploads.   |
+| `app.js`         | UI wiring: wooden door, plate, decal modal, upload, print.  |
 | `sample-data.js` | The pre-populated sample composition shown on first load.   |
